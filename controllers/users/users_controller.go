@@ -3,6 +3,7 @@ package users
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/atg0831/msabookstore/bookstore_users-api/domain/users"
 	"github.com/atg0831/msabookstore/bookstore_users-api/services"
@@ -11,8 +12,19 @@ import (
 )
 
 func GetUser(c *gin.Context) {
+	userID, userErr := strconv.ParseInt(c.Param("user_id"), 10, 64)
+	if userErr != nil {
+		err := errors.NewBadRequestError("invalid user id should be a number")
+		c.JSON(err.Status, err)
+		return
+	}
+	user, getErr := services.GetUser(userID)
+	if getErr != nil {
+		c.JSON(getErr.Status, getErr)
+		return
+	}
+	c.JSON(http.StatusOK, user)
 
-	c.String(http.StatusNotImplemented, "implement me")
 }
 
 func CreateUser(c *gin.Context) {
@@ -36,13 +48,13 @@ func CreateUser(c *gin.Context) {
 		fmt.Println(err.Error())
 		return
 	}
-	result, saveErr := services.CreateUser(user)
+	newUser, saveErr := services.CreateUser(user)
 	if saveErr != nil {
 		c.JSON(saveErr.Status, saveErr)
 		return
 	}
 	fmt.Println(user)
-	c.JSON(http.StatusCreated, result)
+	c.JSON(http.StatusCreated, newUser)
 
 }
 
