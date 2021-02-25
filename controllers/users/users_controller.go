@@ -11,10 +11,18 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func GetUser(c *gin.Context) {
-	userID, userErr := strconv.ParseInt(c.Param("user_id"), 10, 64)
+//url의 /:user_id param을 int로 변환해서 user의 ID 추출
+func getUserID(userIDParam string) (int64, *errors.RestErr) {
+	userID, userErr := strconv.ParseInt(userIDParam, 10, 64)
 	if userErr != nil {
-		err := errors.NewBadRequestError("invalid user id should be a number")
+		return 0, errors.NewBadRequestError("user id should be a number")
+	}
+	return userID, nil
+}
+
+func GetUser(c *gin.Context) {
+	userID, err := getUserID(c.Param("user_id"))
+	if err != nil {
 		c.JSON(err.Status, err)
 		return
 	}
@@ -55,10 +63,51 @@ func CreateUser(c *gin.Context) {
 	}
 	fmt.Println(user)
 	c.JSON(http.StatusCreated, newUser)
+}
 
+func UpdateUser(c *gin.Context) {
+	userID, err := getUserID(c.Param("user_id"))
+	if err != nil {
+		c.JSON(err.Status, err)
+		return
+	}
+	var user users.User
+	if err := c.ShouldBindJSON(&user); err != nil {
+		restErr := errors.NewBadRequestError("invalid json body")
+		c.JSON(restErr.Status, restErr)
+	}
+
+	user.ID = userID
+	//Patch request 왔을 경우 isPartial = true
+	isPartial := c.Request.Method == http.MethodPatch
+	updateUser, updateErr := services.UpdateUser(isPartial, user)
+	if updateErr != nil {
+		c.JSON(updateErr.Status, updateErr)
+		return
+	}
+	c.JSON(http.StatusOK, updateUser)
+}
+
+func DeleteUser(c *gin.Context) {
+	userID, err := getUserID(c.Param("user_id"))
+	if err != nil {
+		c.JSON(err.Status, err)
+		return
+	}
+
+	delErr := services.DeleteUser(userID)
+	if delErr != nil {
+		c.JSON(delErr.Status, delErr)
+		return
+	}
+	c.JSON(http.StatusOK, map[string]string{"status": "deleted"})
 }
 
 func SearchUser(c *gin.Context) {
-	c.String(http.StatusNotImplemented, "implement me")
-
+	status := c.Query("status")
+	users, err := services.Search(status)
+	if err != nil {
+		c.JSON(err.Status, err)
+	}
+	c.JSON(http.StatusOK, users)
 }

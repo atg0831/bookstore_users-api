@@ -1,7 +1,10 @@
 package services
 
 import (
+	"strings"
+
 	"github.com/atg0831/msabookstore/bookstore_users-api/domain/users"
+	"github.com/atg0831/msabookstore/bookstore_users-api/utils/date_utils"
 	"github.com/atg0831/msabookstore/bookstore_users-api/utils/errors"
 )
 
@@ -18,9 +21,58 @@ func CreateUser(user users.User) (*users.User, *errors.RestErr) {
 		return nil, err
 	}
 
+	user.Status = users.StatusActive
+	user.DateCreated = date_utils.GetNowDBFormat()
 	if err := user.Save(); err != nil {
 		return nil, err
 	}
 
 	return &user, nil
+}
+
+func UpdateUser(isPartial bool, user users.User) (*users.User, *errors.RestErr) {
+	//현재 db에 있는 user 정보를 current에 담음
+	current, err := GetUser(user.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	user.Email = strings.TrimSpace(user.Email)
+
+	//isPartial==true => PATHCH request
+	//isPartial==false => PUT request
+	if isPartial {
+		if user.FirstName != "" {
+			current.FirstName = user.FirstName
+		}
+		if user.LastName != "" {
+			current.LastName = user.LastName
+		}
+		if user.Email != "" {
+			current.Email = user.Email
+		}
+		if user.Status != "" {
+			current.Status = user.Status
+		}
+	} else {
+		//current에 update할 user 정보를 update
+		current.FirstName = user.FirstName
+		current.LastName = user.LastName
+		current.Email = user.Email
+	}
+	if err := current.Update(); err != nil {
+		return nil, err
+	}
+	return current, nil
+}
+
+func DeleteUser(userID int64) *errors.RestErr {
+	user := &users.User{ID: userID}
+	return user.Delete()
+}
+
+func Search(status string) ([]users.User, *errors.RestErr) {
+	user := &users.User{}
+	return user.FindByStatus(status)
+
 }
