@@ -9,6 +9,7 @@ import (
 )
 
 const (
+	queryGetAllUsers      = "SELECT * FROM users LIMIT ? OFFSET ?;"
 	queryInsertUser       = "INSERT INTO users(first_name,last_name,email,status,password,date_created) VALUES(?,?,?,?,?,?);"
 	queryGetUser          = "SELECT id, first_name,last_name,email,status,date_created FROM users WHERE id=?;"
 	queryUpdateUser       = "UPDATE users SET first_name=?,last_name=?,email=?, status=? WHERE id=?;"
@@ -28,6 +29,31 @@ func (user *User) Get() *errors.RestErr {
 	}
 
 	return nil
+}
+
+func (user *User) GetAll() ([]User, *errors.RestErr) {
+	stmt, err := users_db.Client.Prepare(queryGetAllUsers)
+	if err != nil {
+		return nil, errors.NewInternalServerError(err.Error())
+	}
+	defer stmt.Close()
+
+	rows, err := stmt.Query(2, 3)
+	if err != nil {
+		return nil, errors.NewInternalServerError(err.Error())
+	}
+	defer rows.Close()
+
+	results := make([]User, 0)
+	for rows.Next() {
+		var user User
+		if err := rows.Scan(&user.ID, &user.FirstName, &user.LastName, &user.Email, &user.Status, &user.Password, &user.DateCreated); err != nil {
+			return nil, mysql_utils.ParseError(err)
+		}
+		results = append(results, user)
+	}
+	return results, nil
+
 }
 func (user *User) Save() *errors.RestErr {
 	stmt, err := users_db.Client.Prepare(queryInsertUser)

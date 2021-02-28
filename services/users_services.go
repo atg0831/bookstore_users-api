@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/atg0831/msabookstore/bookstore_users-api/domain/users"
+	"github.com/atg0831/msabookstore/bookstore_users-api/utils/crypto_utils"
 	"github.com/atg0831/msabookstore/bookstore_users-api/utils/date_utils"
 	"github.com/atg0831/msabookstore/bookstore_users-api/utils/errors"
 )
@@ -16,6 +17,12 @@ func GetUser(userID int64) (*users.User, *errors.RestErr) {
 	return result, nil
 
 }
+
+func GetAllUsers() (users.Users, *errors.RestErr) {
+	user := &users.User{}
+	return user.GetAll()
+}
+
 func CreateUser(user users.User) (*users.User, *errors.RestErr) {
 	if err := user.Validate(); err != nil {
 		return nil, err
@@ -23,6 +30,7 @@ func CreateUser(user users.User) (*users.User, *errors.RestErr) {
 
 	user.Status = users.StatusActive
 	user.DateCreated = date_utils.GetNowDBFormat()
+	user.Password = crypto_utils.GetMd5(user.Password)
 	if err := user.Save(); err != nil {
 		return nil, err
 	}
@@ -71,8 +79,10 @@ func DeleteUser(userID int64) *errors.RestErr {
 	return user.Delete()
 }
 
-func Search(status string) ([]users.User, *errors.RestErr) {
+func Search(status string) (users.Users, *errors.RestErr) {
 	user := &users.User{}
+	//dao의 findbystatus가 user의 list를 return하고 users.Users가 []User 타입이니까
+	//그대로 return하면됨
 	return user.FindByStatus(status)
 
 }
