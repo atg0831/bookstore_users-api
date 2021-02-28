@@ -9,7 +9,22 @@ import (
 	"github.com/atg0831/msabookstore/bookstore_users-api/utils/errors"
 )
 
-func GetUser(userID int64) (*users.User, *errors.RestErr) {
+var (
+	UserService userServiceInterface = &userService{}
+)
+
+type userService struct{}
+
+type userServiceInterface interface {
+	GetUser(int64) (*users.User, *errors.RestErr)
+	GetAllUsers() (users.Users, *errors.RestErr)
+	CreateUser(users.User) (*users.User, *errors.RestErr)
+	UpdateUser(bool, users.User) (*users.User, *errors.RestErr)
+	DeleteUser(int64) *errors.RestErr
+	Search(string) (users.Users, *errors.RestErr)
+}
+
+func (s *userService) GetUser(userID int64) (*users.User, *errors.RestErr) {
 	result := &users.User{ID: userID}
 	if err := result.Get(); err != nil {
 		return nil, err
@@ -18,12 +33,12 @@ func GetUser(userID int64) (*users.User, *errors.RestErr) {
 
 }
 
-func GetAllUsers() (users.Users, *errors.RestErr) {
+func (s *userService) GetAllUsers() (users.Users, *errors.RestErr) {
 	user := &users.User{}
 	return user.GetAll()
 }
 
-func CreateUser(user users.User) (*users.User, *errors.RestErr) {
+func (s *userService) CreateUser(user users.User) (*users.User, *errors.RestErr) {
 	if err := user.Validate(); err != nil {
 		return nil, err
 	}
@@ -38,9 +53,9 @@ func CreateUser(user users.User) (*users.User, *errors.RestErr) {
 	return &user, nil
 }
 
-func UpdateUser(isPartial bool, user users.User) (*users.User, *errors.RestErr) {
+func (s *userService) UpdateUser(isPartial bool, user users.User) (*users.User, *errors.RestErr) {
 	//현재 db에 있는 user 정보를 current에 담음
-	current, err := GetUser(user.ID)
+	current, err := s.GetUser(user.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -74,12 +89,12 @@ func UpdateUser(isPartial bool, user users.User) (*users.User, *errors.RestErr) 
 	return current, nil
 }
 
-func DeleteUser(userID int64) *errors.RestErr {
+func (s *userService) DeleteUser(userID int64) *errors.RestErr {
 	user := &users.User{ID: userID}
 	return user.Delete()
 }
 
-func Search(status string) (users.Users, *errors.RestErr) {
+func (s *userService) Search(status string) (users.Users, *errors.RestErr) {
 	user := &users.User{}
 	//dao의 findbystatus가 user의 list를 return하고 users.Users가 []User 타입이니까
 	//그대로 return하면됨
