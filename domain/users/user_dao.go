@@ -2,6 +2,7 @@ package users
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/atg0831/msabookstore/bookstore_users-api/datasources/mariadb/users_db"
 	"github.com/atg0831/msabookstore/bookstore_users-api/logger"
@@ -10,12 +11,13 @@ import (
 )
 
 const (
-	queryGetAllUsers      = "SELECT * FROM users LIMIT ? OFFSET ?;"
-	queryInsertUser       = "INSERT INTO users(first_name,last_name,email,status,password,date_created) VALUES(?,?,?,?,?,?);"
-	queryGetUser          = " id, first_name,last_name,email,status,date_created FROM users WHERE id=?;"
-	queryUpdateUser       = "UPDATE users SET first_name=?,last_name=?,email=?, status=? WHERE id=?;"
-	queryDeleteUser       = "DELETE FROM users WHERE id=?;"
-	queryFindUserByStatus = "SELECT id, first_name,last_name,email,status,date_created FROM users WHERE status=?;"
+	queryGetAllUsers            = "SELECT * FROM users LIMIT ? OFFSET ?;"
+	queryInsertUser             = "INSERT INTO users(first_name,last_name,email,status,password,date_created) VALUES(?,?,?,?,?,?);"
+	queryGetUser                = "SELECT id, first_name,last_name,email,status,date_created FROM users WHERE id=?;"
+	queryUpdateUser             = "UPDATE users SET first_name=?,last_name=?,email=?, status=? WHERE id=?;"
+	queryDeleteUser             = "DELETE FROM users WHERE id=?;"
+	queryFindByStatus           = "SELECT id, first_name,last_name,email,status,date_created FROM users WHERE status=?;"
+	queryFindByEmailAndPassword = "SELECT id,first_name,last_name,email,status,date_created FROM users WHERE email=? AND password=? AND status=?;"
 )
 
 func (user *User) Get() *errors.RestErr {
@@ -29,7 +31,7 @@ func (user *User) Get() *errors.RestErr {
 	defer stmt.Close()
 	result := stmt.QueryRow(user.ID)
 	if getErr := result.Scan(&user.ID, &user.FirstName, &user.LastName, &user.Email, &user.Status, &user.DateCreated); getErr != nil {
-		logger.Error("error when trying to prepare get user by id", getErr)
+		logger.Error("error when trying to get user by id", getErr)
 		return errors.NewInternalServerError("database error")
 	}
 
@@ -115,7 +117,7 @@ func (user *User) Delete() *errors.RestErr {
 }
 
 func (user *User) FindByStatus(status string) ([]User, *errors.RestErr) {
-	stmt, err := users_db.Client.Prepare(queryFindUserByStatus)
+	stmt, err := users_db.Client.Prepare(queryFindByStatus)
 	if err != nil {
 		logger.Error("error when trying to prepare to find users by status statement", err)
 		return nil, errors.NewInternalServerError("database error")
@@ -142,4 +144,25 @@ func (user *User) FindByStatus(status string) ([]User, *errors.RestErr) {
 		return nil, errors.NewNotFoundError(fmt.Sprintf("no users matching status %s", status))
 	}
 	return results, nil
+}
+
+func (user *User) FindByEmailAndPassword() *errors.RestErr {
+	stmt, err := users_db.Client.Prepare(queryFindByEmailAndPassword)
+	if err != nil {
+		//logger에는 개발할 때 어떻게 error 발생했는지 보여주고
+		logger.Error("error when trying to prepare get user by email and password statement", err)
+		//요기는 open 되는 error니까 err.Error() 이렇게 내용을 보여주지 말고 msg만 보여줘라
+		return errors.NewInternalServerError("database error")
+	}
+	defer stmt.Close()
+	result := stmt.QueryRow(user.Email, user.Password, StatusActive)
+	if getErr := result.Scan(&user.ID, &user.FirstName, &user.LastName, &user.Email, &user.Status, &user.DateCreated); getErr != nil {
+		if strings.Contains(getErr.Error(), mysql_utils.ErrorNoRows) {
+			return errors.NewNotFoundError("invalid user credentials")
+		}
+		logger.Error("error when trying to find by email and password", getErr)
+		return errors.NewInternalServerError("database error")
+	}
+
+	return nil
 }
